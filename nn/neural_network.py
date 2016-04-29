@@ -272,7 +272,7 @@ def train_climin(data, report_errors):
     )
 
     # climin_optimizer = climin.GradientDescent(classifier.get_params(), classifier.loss_grad, step_rate=0.02, momentum=.95, args=args)
-    climin_optimizer = climin.RmsProp(classifier.get_params(), classifier.loss_grad, step_rate=0.02, args=args)
+    climin_optimizer = climin.RmsProp(classifier.get_params(), classifier.loss_grad, step_rate=0.005, decay=0.9, args=args)
 
     validation_model = theano.function(
         inputs=[index],
