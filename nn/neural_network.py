@@ -1,13 +1,18 @@
+import sys
+import os
+current_dir = os.path.dirname(os.path.realpath(__file__)) + '/'
+sys.path.append(current_dir  + '..')
+
 import numpy
 import theano
 import theano.tensor as tensor
 import logreg.logreg as logreg
 import climin
 import climin.util
+import utils
 from matplotlib import pyplot
 
 
-# start-snippet-1
 class HiddenLayer(object):
     def __init__(self, rng, input, n_in, n_out, w=None, b=None, activation=tensor.tanh):
         self.input = input
@@ -30,8 +35,8 @@ class HiddenLayer(object):
             if activation == tensor.nnet.sigmoid:
                 w *= 4
 
-            self.weights = theano.shared(value=w, name='weights_hidden', borrow=True)
-            self.bias = theano.shared(value=b, name='bias_hidden', borrow=True)
+            self.weights = theano.shared(value=w, name='weights_hidden')
+            self.bias = theano.shared(value=b, name='bias_hidden')
         else:
             self.weights = w
             self.bias = b
@@ -40,10 +45,8 @@ class HiddenLayer(object):
         self.template = [(n_in, n_out), (n_out,)]
 
 
-# start-snippet-2
 class NeronalNetwork(object):
-
-    def __init__(self, rng, x, y, n_in, n_hidden, n_out):
+    def __init__(self, rng, x, y, n_in, n_hidden, n_out, activation=tensor.tanh):
         self.x = x
         self.y = y
 
@@ -52,7 +55,7 @@ class NeronalNetwork(object):
             input=self.x,
             n_in=n_in,
             n_out=n_hidden,
-            activation=tensor.tanh
+            activation=activation
         )
 
         # The logistic regression layer gets as input the hidden units
@@ -66,11 +69,6 @@ class NeronalNetwork(object):
         self.L1 = (
             abs(self.hidden_layer.weights).sum()
             + abs(self.logreg_layer.weights).sum()
-        )
-
-        self.L2_sqr = (
-            (self.hidden_layer.weights ** 2).sum()
-            + (self.logreg_layer.weights ** 2).sum()
         )
 
         self.params = [self.hidden_layer.weights, self.hidden_layer.bias, self.logreg_layer.weights,
@@ -109,16 +107,14 @@ class NeronalNetwork(object):
 
     def loss_func(self, params, input, target):
         self.set_params(params)
-        return numpy.concatenate([overall.flatten() for overall in self.loss_overall(input, target)])
+        return self.loss_overall(input, target)
 
 
-def train_l1_l2(data, report_errors):
+def train_l1(data, report_errors, activation = tensor.tanh, name="errors.png"):
     # configuration
-
     learning_rate = 0.01
-    L1_reg = 0.00
-    L2_reg = 0.0001
-    epochs = 1
+    L1 = 0.0001
+    epochs = 30
     batch_size = 20
     n_hidden = 300
 
@@ -143,13 +139,13 @@ def train_l1_l2(data, report_errors):
         y=y,
         n_in=28 * 28,
         n_hidden=n_hidden,
-        n_out=10
+        n_out=10,
+        activation = activation
     )
 
     cost = (
         classifier.logreg_layer.log_loss()
-        + L1_reg * classifier.L1
-        + L2_reg * classifier.L2_sqr
+        + L1 * classifier.L1
     )
 
     updates = [
@@ -191,9 +187,9 @@ def train_l1_l2(data, report_errors):
     current_epochs = 0
     best_loss = numpy.inf
     best_settings = classifier.get_params()
-    stop_loop = False
+    stop_count = 0
 
-    while current_epochs < epochs and not stop_loop:
+    while current_epochs < epochs and not stop_count > 5:
         for batch_index in range(0, n_train_batches):
             train_model(batch_index)
 
@@ -212,12 +208,16 @@ def train_l1_l2(data, report_errors):
             current_train_loss = 0
             for batch_index in range(0, n_train_batches):
                 current_train_loss += train_error_model(batch_index)
-                current_train_loss /= n_train_batches
+            current_train_loss /= n_train_batches
             training_error.append(current_train_loss)
 
         if current_validation_loss < best_loss:
             best_loss = current_validation_loss
             best_settings = classifier.get_params()
+            stop_count = 0
+        else:
+            stop_count += 1
+
         print(
             'Current Epoch: %i \t Current Validation Error: %f %%' %
             (
@@ -230,16 +230,13 @@ def train_l1_l2(data, report_errors):
     classifier.set_params(best_settings)
 
     if report_errors:
-        problem_12(training_error, validation_error, test_error)
+        problem_17(training_error, validation_error, test_error, name=name)
 
     return classifier, best_loss
 
-def train_climin(data, report_errors):
+def train_climin(data, report_errors, epochs=10, activation=tensor.tanh, name="errors.png", optimizer="rmsprop"):
     # configuration
-
-    learning_rate = 0.01
-    epochs = 10
-    batch_size = 20
+    batch_size = 100
     n_hidden = 300
 
     train_set, valid_set, test_set = data
@@ -268,11 +265,18 @@ def train_climin(data, report_errors):
         y=y,
         n_in=28 * 28,
         n_hidden=n_hidden,
-        n_out=10
+        n_out=10,
+        activation=activation
     )
 
-    # climin_optimizer = climin.GradientDescent(classifier.get_params(), classifier.loss_grad, step_rate=0.02, momentum=.95, args=args)
-    climin_optimizer = climin.RmsProp(classifier.get_params(), classifier.loss_grad, step_rate=0.005, decay=0.9, args=args)
+    if optimizer is "sgd":
+        print "Gradient Descent"
+        climin_optimizer = climin.GradientDescent(classifier.get_params(), classifier.loss_grad,
+                                                  step_rate=0.02, momentum=.95, args=args)
+    else:
+        print "rmsprop"
+        climin_optimizer = climin.RmsProp(classifier.get_params(), classifier.loss_grad,
+                                          step_rate=0.007, decay=0.9, args=args)
 
     validation_model = theano.function(
         inputs=[index],
@@ -294,11 +298,14 @@ def train_climin(data, report_errors):
     current_run = 0
     best_loss = numpy.inf
     best_settings = classifier.get_params()
-    stop_loop = False
+    stop_count = 0
 
     for info in climin_optimizer:
-        if current_run > epochs * n_train_batches or stop_loop:
+        if current_run > epochs * n_train_batches or stop_count > 5:
             break
+
+        current_run += 1
+
         # check on validation
         if current_run % n_train_batches is 0 and current_run > 0:
             current_validation_loss = 0
@@ -315,12 +322,16 @@ def train_climin(data, report_errors):
                 current_train_loss = 0
                 for batch_index in range(0, n_train_batches):
                     current_train_loss += train_error_model(batch_index)
-                    current_train_loss /= n_train_batches
+                current_train_loss /= n_train_batches
                 training_error.append(current_train_loss)
 
             if current_validation_loss < best_loss:
                 best_loss = current_validation_loss
                 best_settings = classifier.get_params()
+                stop_count = 0
+            else:
+                stop_count += 1
+
             print(
                 'Current Epoch: %i \t Current Validation Error: %f %%' %
                 (
@@ -328,12 +339,12 @@ def train_climin(data, report_errors):
                     best_loss * 100.
                 )
             )
-        current_run += 1
+
 
     classifier.set_params(best_settings)
 
     if report_errors:
-        problem_12(training_error, validation_error, test_error)
+        problem_17(training_error, validation_error, test_error, name=name)
 
     return classifier, best_loss
 
@@ -363,29 +374,76 @@ def test(classifier, data):
     loss /= n_test_batches
     return loss
 
-def problem_8():
-    data = logreg.loadMinstDataSet("/home/durner/Downloads/mnist.pkl.gz", augument=False)
-    classifier, smallest_validation_loss = train_l1_l2(data, True)
+def problem_14():
+    data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz", augument=False)
+    classifier, smallest_validation_loss = \
+        train_climin(data, True, epochs=30, activation=tensor.nnet.relu, name='errors_sgd.png', optimizer="sgd")
     print(
         'Test Set Error: %f %%' %
         (
             test(classifier, data) * 100.
         )
     )
-    problem_11(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28)
+    problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_sgd.png")
 
-def problem_10():
-    data = logreg.loadMinstDataSet("/home/durner/Downloads/mnist.pkl.gz", augument=False)
-    classifier, smallest_validation_loss = train_climin(data, True)
+
+def problem_14_bonus():
+    data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz", augument=False)
+    classifier, smallest_validation_loss = train_l1(data, True, name='errors_l1.png')
     print(
         'Test Set Error: %f %%' %
         (
             test(classifier, data) * 100.
         )
     )
-    problem_11(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28)
+    problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_l1.png")
 
-def problem_11(weights, rows, cols, height, width):
+def problem_19():
+    data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz", augument=True)
+    classifier, smallest_validation_loss = \
+        train_climin(data, True, epochs=30, activation=tensor.nnet.relu, name='errors_optimized.png', optimizer="sgd")
+    print(
+        'Test Set Error: %f %%' %
+        (
+            test(classifier, data) * 100.
+        )
+    )
+    problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_optimized.png")
+
+def problem_16():
+    data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz", augument=False)
+    classifier, smallest_validation_loss = \
+        train_climin(data, True, epochs=30, activation=tensor.nnet.sigmoid, name='errors_sigmoid.png')
+    print(
+        'Test Set Error: %f %%' %
+        (
+            test(classifier, data) * 100.
+        )
+    )
+    problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_sigmoid.png")
+
+    classifier, smallest_validation_loss = \
+        train_climin(data, True, epochs=30, activation=tensor.tanh, name='errors_tanh.png')
+    print(
+        'Test Set Error: %f %%' %
+        (
+            test(classifier, data) * 100.
+        )
+    )
+    problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_tanh.png")
+
+    classifier, smallest_validation_loss = \
+        train_climin(data, True, epochs=30, activation=tensor.nnet.relu, name='errors_relu.png')
+    print(
+        'Test Set Error: %f %%' %
+        (
+            test(classifier, data) * 100.
+        )
+    )
+    problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_relu.png")
+
+
+def problem_18(weights, rows, cols, height, width, name="repflds.png"):
     border = 2
 
     image = numpy.zeros((rows * height + border * rows, cols * width + border * cols))
@@ -400,20 +458,23 @@ def problem_11(weights, rows, cols, height, width):
     pyplot.axis('off')
     pyplot.set_cmap('gist_ncar')
     pyplot.colorbar()
-    pyplot.savefig('repflds.png', dpi=300)
+    pyplot.savefig(name, dpi=300)
 
 
-def problem_12(training_error, validation_error, test_error):
+def problem_17(training_error, validation_error, test_error, name="errors.png"):
     pyplot.figure()
-    pyplot.plot(range(len(training_error)), training_error, label="Train Error")
-    pyplot.plot(range(len(validation_error)), validation_error, label="Validation Error")
-    pyplot.plot(range(len(test_error)), test_error, label="Test Error")
+    pyplot.plot(range(1, len(training_error)+1), training_error, label="Train Error")
+    pyplot.plot(range(1, len(validation_error)+1), validation_error, label="Validation Error")
+    pyplot.plot(range(1, len(test_error)+1), test_error, label="Test Error")
     pyplot.xlabel("epochs")
     pyplot.ylabel("error")
-    pyplot.legend(loc='upper center', bbox_to_anchor=(0.5, -0.5),
-                  fancybox=True, shadow=True, ncol=3)
-    pyplot.savefig('errors.png')
+    pyplot.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
+                  ncol=3, fancybox=True, shadow=True)
+    pyplot.savefig(name)
 
 
 if __name__ == '__main__':
-    problem_10()
+    problem_19()
+    problem_14()
+    problem_14_bonus()
+    problem_16()

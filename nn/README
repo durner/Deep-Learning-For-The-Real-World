@@ -1,0 +1,11 @@
+Problem 14: I implemented the gradient descent neural network with the help of climin's optimizers. Accordingly, I could easily change my implementation to rmsprop. For the code see neural_network.py, function problem 14.
+
+Problem 14 Bonus: I also implemented the training without climin and gradient descent. There I used also l1 regularisation for improving my results. See function problem_14_bonus for the code.
+
+Problem 15: Using standard gradient descent and tanh, I got an error of about 2.2%. We can see that we can learn the representation of MNIST way better with a neural network than pure Logistic Regression. I used a batch size of 100 and run at most 30 epochs (but implemented early stopping).
+
+Problem 16:
+
+Problem 17 & 18: I used the gradient descent algorithm for computing the plots.
+
+Problem 19: With augumented MNIST dataset (described in the logreg README) I can achieve wtih Gradient Descent and as activation function relu an error on my test set of about 1.7%. See repflds_optimized.png and errors_optimized.png.
