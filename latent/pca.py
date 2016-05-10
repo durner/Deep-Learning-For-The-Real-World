@@ -1,11 +1,15 @@
+import sys
+import os
+current_dir = os.path.dirname(os.path.realpath(__file__)) + '/'
+sys.path.append(current_dir  + '..')
+
 import theano
 import theano.tensor as tensor
 import theano.tensor.nlinalg as linalg
-from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 from itertools import product
-
-from logreg import logreg
+import os
+import utils
 
 
 class PCA(object):
@@ -36,7 +40,7 @@ class PCA(object):
         self.output = tensor.dot(self.x, self.w)
 
 
-def train(data, name):
+def train(trainx, trainy, name):
     x = tensor.matrix('x')
 
     pca = PCA(x, components=2)
@@ -47,11 +51,7 @@ def train(data, name):
         outputs=pca.output,
     )
 
-    trainx, trainy = data
-    X_train, y_train = trainx.eval() / 255., trainy.eval()
-    X_train, y_train = shuffle(X_train, y_train)
-    X_train = X_train[:5000]
-    y_train = y_train[:5000]
+    X_train, y_train = trainx / 255., trainy
 
     print "pca running..."
 
@@ -64,6 +64,7 @@ def train(data, name):
         X_ = X_train[(y_train == i) + (y_train == j)]
         y_ = y_train[(y_train == i) + (y_train == j)]
         X_transformed = train_model(X_)
+        print "pca " , i,  " and " , j
         plots[i, j].scatter(X_transformed[:, 0], X_transformed[:, 1], c=y_)
         plots[i, j].set_xticks(())
         plots[i, j].set_yticks(())
@@ -79,5 +80,9 @@ def train(data, name):
     plt.savefig(name)
 
 if __name__ == '__main__':
-    train, valid, test = logreg.loadMinstDataSet("/home/durner/Downloads/mnist.pkl.gz")
-    train(train, "mnist.png")
+    train_data, valid_data, test_data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz")
+    trainx, trainy = valid_data
+    train(trainx.eval(), trainy.eval(), "scatterplotMNIST.png")
+
+    trainx, trainy = utils.load_cifar_file(os.path.join(current_dir + "../cifar-10-batches-py/", 'test_batch'))
+    train(utils.convert_to_grayscale(trainx), trainy, "scatterplotCIFAR.png")
