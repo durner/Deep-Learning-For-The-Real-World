@@ -8,6 +8,13 @@ import random
 import theano
 import theano.tensor as tensor
 
+def load_MNIST(filename):
+    with gzip.open(filename, 'rb') as f:
+        try:
+            train_set, valid_set, test_set = pickle.load(f, encoding='latin1')
+        except:
+            train_set, valid_set, test_set = pickle.load(f)
+    return train_set, valid_set, test_set
 
 def loadMinstDataSet(filename, augument=False):
     def shared_dataset(data_xy, augument=False, borrow=True):
@@ -41,13 +48,9 @@ def loadMinstDataSet(filename, augument=False):
 
         return shared_x, tensor.cast(shared_y, 'int32')
 
-    with gzip.open(filename, 'rb') as f:
-        try:
-            train_set, valid_set, test_set = pickle.load(f, encoding='latin1')
-        except:
-            train_set, valid_set, test_set = pickle.load(f)
+    train_set, valid_set, test_set = load_MNIST(filename)
 
-        return shared_dataset(train_set, augument), shared_dataset(valid_set), shared_dataset(test_set)
+    return shared_dataset(train_set, augument), shared_dataset(valid_set), shared_dataset(test_set)
 
 
 def load_cifar_file(filename):

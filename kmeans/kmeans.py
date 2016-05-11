@@ -124,5 +124,7 @@ def train(trainx, trainy, name, n_center):
 
 if __name__ == '__main__':
     trainx, trainy, testx, testy = utils.load_cifar(current_dir + "../cifar-10-batches-py/", True)
+    trainx = numpy.asarray(numpy.vstack((trainx, testx)), dtype=numpy.float64)
+    trainy = numpy.hstack((trainy, testy))
     print "loaded!"
     train(trainx, trainy, "cifar.png", 400)

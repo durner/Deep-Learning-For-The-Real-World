@@ -3,6 +3,7 @@ import os
 current_dir = os.path.dirname(os.path.realpath(__file__)) + '/'
 sys.path.append(current_dir  + '..')
 
+import numpy as np
 import theano
 import theano.tensor as tensor
 import theano.tensor.nlinalg as linalg
@@ -80,9 +81,14 @@ def train(trainx, trainy, name):
     plt.savefig(name)
 
 if __name__ == '__main__':
-    train_data, valid_data, test_data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz")
-    trainx, trainy = valid_data
-    train(trainx.eval(), trainy.eval(), "scatterplotMNIST.png")
+    train_set, valid_set, test_set = utils.load_MNIST(current_dir + "../mnist.pkl.gz")
+    data = np.asarray(np.vstack((train_set[0], valid_set[0], test_set[0])), dtype=np.float64)
+    y = np.hstack((train_set[1], valid_set[1], test_set[1]))
+    print 'loaded!'
+    train(data, y, "scatterplotMNIST.png")
 
-    trainx, trainy = utils.load_cifar_file(os.path.join(current_dir + "../cifar-10-batches-py/", 'test_batch'))
-    train(utils.convert_to_grayscale(trainx), trainy, "scatterplotCIFAR.png")
+    trainx, trainy, testx, testy = utils.load_cifar(current_dir + "../cifar-10-batches-py/")
+    trainx = np.asarray(np.vstack((trainx, testx)), dtype=np.float64)
+    trainy = np.hstack((trainy, testy))
+    print "loaded!"
+    train(trainx, trainy, "scatterplotCIFAR.png")
