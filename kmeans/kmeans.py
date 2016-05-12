@@ -15,8 +15,34 @@ def normalize_dict(D):
     D /= lengths
     return D
 
+def norm_dict(D):
+    lengths = tensor.sqrt(tensor.sum(D ** 2, axis=0))
+    D /= lengths
+    return D
+
+class KMeansPreprocessing(object):
+    def __init__(self, x, dim, eps_var=10, eps_whiten=0.01):
+        self.x = x
+        self.dim = dim
+
+        self.x_normalized = x - tensor.mean(x, axis=0)
+        self.x_normalized /= tensor.sqrt(tensor.var(self.x, axis=0) + eps_var)
+
+        # calculate covariance matrix
+        self.cov = tensor.dot(self.x_normalized.T, self.x_normalized) / float(dim - 1)
+
+        self.W, self.V, _ = tensor.nlinalg.svd(self.cov) # maybe transpose the cov!
+
+        # calculate the whitening
+        self.step_between = tensor.dot(tensor.dot(self.W,
+                                                  tensor.diag(float(1) / tensor.sqrt(self.V + eps_whiten))), self.W.T)
+
+
+        self.x_whiten = tensor.dot(self.x_normalized, self.step_between)
+
 class KMeansCoates(object):
-    def __init__(self, x, dim, centers, batch_size, numpy_rng, eps_var=10, eps_whiten=0.01):
+    # already whitened x needed for KMeans
+    def __init__(self, x, dim, centers, batch_size, numpy_rng):
         self.x = x
         self.dim = dim
         self.centers = centers
@@ -36,28 +62,14 @@ class KMeansCoates(object):
         # initial_dict = normalize_dict(initial_dict)
         self.D = theano.shared(value=normalize_dict(initial_dict), name='dictionary')
 
+        self.S = tensor.dot(self.x, self.D)
 
-        self.x_normalized = x - tensor.mean(x, axis=0)
-        self.x_normalized /= tensor.sqrt(tensor.var(self.x, axis=0) + eps_var)
+        indices = tensor.eye(self.centers)[tensor.argmax(self.S, axis=1)]
+        self.S = tensor.switch(indices, self.S, tensor.zeros_like(self.S))
 
-        # calculate covariance matrix
-        self.cov = tensor.dot(self.x_normalized.T, self.x_normalized) / float(dim - 1)
+        self.update = tensor.dot(self.x.T, self.S)
 
-        self.W, self.V, _ = tensor.nlinalg.svd(self.cov) # maybe transpose the cov!
-
-        # calculate the whitening
-        self.step_between = tensor.dot(tensor.dot(self.W,
-                                                  tensor.diag(float(1) / tensor.sqrt(self.V + eps_whiten))), self.W.T)
-
-
-        self.x_whiten = tensor.dot(self.x_normalized, self.step_between)
-
-        self.S = tensor.dot(self.x_whiten, self.D)
-
-        self.update = tensor.dot(self.x_whiten.T, self.S)
-
-    def return_result(self):
-        return self.S, self.x_whiten
+        self.D = norm_dict(self.D + self.update)
 
 
 def problem_31(values, rows, cols, height, width, name="repflds.png"):
@@ -84,41 +96,31 @@ def train(trainx, trainy, name, n_center):
     rng = numpy.random.RandomState(1337)
 
     kmeans = KMeansCoates(x, X_train.shape[1], n_center, X_train.shape[0], rng)
+    preprocessing = KMeansPreprocessing(x, X_train.shape[1])
 
+    preprocessing_model = theano.function(
+        inputs=[x],
+        outputs=preprocessing.x_whiten
+    )
 
     train_model = theano.function(
         inputs=[x],
-        outputs=kmeans.return_result(),
+        outputs=(kmeans.D, kmeans.S),
     )
-
-    s = tensor.matrix('s')
-    calculate_update = theano.function(
-        inputs=[x, s],
-        outputs=tensor.dot(x.T, s),
-    )
+    x_whiten = preprocessing_model(X_train)
 
     for k in range(10):
         print "run ", k
-        S, x_whiten = train_model(X_train)
-
-        # set argmax value only
-        sprime = numpy.zeros((X_train.shape[0], n_center))
-        argmax_k = numpy.argmax(numpy.abs(S), axis=1)
-        for i in xrange(X_train.shape[0]):
-            sprime[i, argmax_k[i]] =  1
-        S *= sprime
-
-        kmeans.D.set_value(normalize_dict(kmeans.D.get_value() + calculate_update(x_whiten, S)))
-
+        D, S = train_model(x_whiten)
 
         # reinitialize empty clusters
         step = numpy.sum(S.T, axis=0)
         for i in range(n_center):
             if step[i] == 0:
                 idx = numpy.random.randint(X_train.shape[1])
-                kmeans.D[:, i].set_value(x_whiten[idx])
+                tensor.set_subtensor(kmeans.D[:, i], kmeans.x[idx])
 
-    problem_31(kmeans.D.get_value(), int(numpy.sqrt(n_center)), int(numpy.sqrt(n_center)), 12, 12)
+    problem_31(D, int(numpy.sqrt(n_center)), int(numpy.sqrt(n_center)), 12, 12)
 
 
 

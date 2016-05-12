@@ -206,7 +206,7 @@ def problem_29(args, n):
     plt.savefig("figure5_"+str(n)+".svg", format="svg")
 
 
-def problem_28(args, data, n, name):
+def problem_28(args, data, n, name, fig_size=50):
     argp = _argparse().parse_args(args[1:])
 
     datax, datay = data
@@ -222,7 +222,7 @@ def problem_28(args, data, n, name):
         X_2d[k,:] = result
         k+=1
 
-    plt.figure(figsize=(50, 50))
+    plt.figure(figsize=(fig_size, fig_size))
     plt.axis('off')
     X_2d *= 100
     
@@ -239,3 +239,12 @@ if __name__ == '__main__':
 
     problem_28(argv, (trainx, trainy), trainx.shape[0], "cifar")
     problem_29(argv, 70000)
+
+    ##### SCIKIT NEEDED FOR NEWSDATA ######
+    # from sklearn.datasets import fetch_20newsgroups
+    # data = fetch_20newsgroups(shuffle=True, random_state=1337)
+    # from sklearn.feature_extraction.text import TfidfVectorizer
+    # X_train_tf = TfidfVectorizer(use_idf=True,  max_features=1500, dtype=np.float64).fit_transform(data.data).toarray()
+    # print X_train_tf.shape
+    # problem_28(argv, (X_train_tf, data.target), X_train_tf.shape[0], "newsdata", fig_size=20)
+    ##### SCIKIT NEEDED FOR NEWSDATA ######

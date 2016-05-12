@@ -171,7 +171,7 @@ def train(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.png",
                28, 28, name=name_filter)
 
 def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.png",
-                 optimizer="rmsprop", sparsity=True, lambda_param=0.1):
+                 optimizer="rmsprop", sparsity=True, lambda_param=0.1, nhidden=100):
     n_hidden = 100
 
     train_set = data
@@ -185,13 +185,16 @@ def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.p
     args = climin.util.iter_minibatches([train_set.get_value()], batch_size, [0, 0])
     args = ((i, {}) for i in args)
 
+    index = tensor.lscalar()
     rng = numpy.random.RandomState(1337)
-
+    n_hidden = nhidden
     auto_encoder = AutoEncoder(
         x=x,
         numpy_rng=rng,
         n_visible=train_set.get_value().shape[1],
-        n_hidden=n_hidden
+        n_hidden=n_hidden,
+        lambda_param=lambda_param,
+        sparse_cost=sparsity
     )
 
     if optimizer is "sgd":
@@ -222,11 +225,13 @@ def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.p
             # reset cost
             c = []
 
-    problem_24(auto_encoder.get_reconstructed_input(
-        auto_encoder.get_hidden_values(train_set[:100])).eval(), 10, 10, 28, 28, name="autoencoderrec_rmsprop.png")
-    problem_25(auto_encoder.weights.get_value(), int(numpy.sqrt(n_hidden)), int(numpy.sqrt(n_hidden)),
-               28, 28, name="autoencoderfilter_rmsprop.png")
+    name_rec = "autoencoderrec_rms_" + str(n_hidden) + "_" + str(lambda_param) + ".png"
+    name_filter ="autoencoderfilter_rms_" + str(n_hidden) + "_" + str(lambda_param) + ".png"
 
+    problem_24(auto_encoder.get_reconstructed_input(
+        auto_encoder.get_hidden_values(train_set[:100])).eval(), 10, 10, 28, 28, name=name_rec)
+    problem_25(auto_encoder.weights.get_value(), int(numpy.sqrt(n_hidden)), int(numpy.sqrt(n_hidden)),
+               28, 28, name=name_filter)
 
 def problem_24(values, rows, cols, height, width, name="autoencoderrec.png"):
     border = 1
@@ -268,6 +273,7 @@ if __name__ == '__main__':
     for n in [784, 400, 225, 100]:
         for k in [0.05, 0.1, 0.2]:
             train(trainx, nhidden=n, sparsity=True, lambda_param=k)
+            #train_climin(trainx, nhidden=n, sparsity=True, lambda_param=k)
 
     train_climin(trainx, optimizer="rmsprop", sparsity=False, lambda_param=0)
     train(trainx, sparsity=False, lambda_param=0)
