@@ -56,12 +56,14 @@ class KMeansCoates(object):
         # initial_dict = normalize_dict(initial_dict)
         self.D = theano.shared(value=normalize_dict(initial_dict), name='dictionary')
 
-        self.S = tensor.dot(self.x, self.D)
+        S = tensor.dot(self.x, self.D)
+
+        indices = tensor.eye(self.centers)[tensor.argmax(tensor.abs_(S), axis=1)]
+        self.S = tensor.switch(indices, S, tensor.zeros_like(S))
 
         self.update = tensor.dot(self.x.T, self.S)
+        self.reinitialize = tensor.sum(self.S, axis=0)
 
-    def return_result(self):
-        return self.S, self.x
 
 def problem_31(values, rows, cols, height, width, name="repflds.png"):
     border = 2
@@ -80,7 +82,7 @@ def problem_31(values, rows, cols, height, width, name="repflds.png"):
     pyplot.savefig(name, dpi=300)
 
 
-def train(trainx, trainy, name, n_center):
+def train(trainx, trainy, n_center):
     X_train, y_train = trainx / 255., trainy
 
     x = tensor.matrix('x')
@@ -98,37 +100,68 @@ def train(trainx, trainy, name, n_center):
 
     train_model = theano.function(
         inputs=[x],
-        outputs=kmeans.return_result(),
-    )
-
-    s = tensor.matrix('s')
-    calculate_update = theano.function(
-        inputs=[x, s],
-        outputs=tensor.dot(x.T, s),
+        outputs=(kmeans.update, kmeans.reinitialize),
     )
 
     for k in range(10):
         print "run ", k
-        S, x = train_model(X_train)
+        update, reinitialize = train_model(x_whiten)
 
-        # set argmax value only
-        sprime = numpy.zeros((X_train.shape[0], n_center))
-        argmax_k = numpy.argmax(numpy.abs(S), axis=1)
-        for i in xrange(X_train.shape[0]):
-            sprime[i, argmax_k[i]] =  1
-        S *= sprime
-
-        kmeans.D.set_value(normalize_dict(kmeans.D.get_value() + calculate_update(x, S)))
-
-
+        # update shared variable
+        D = normalize_dict(kmeans.D.get_value() + update)
+        
         # reinitialize empty clusters
-        step = numpy.sum(S.T, axis=0)
         for i in range(n_center):
-            if step[i] == 0:
-                idx = numpy.random.randint(X_train.shape[1])
-                kmeans.D[:, i].set_value(x[idx])
+            if not float(reinitialize[i]):
+                idx = numpy.random.randint(x_whiten.shape[1])
+                D[:, i] = x_whiten[idx]
+
+        kmeans.D.set_value(D)
 
     problem_31(kmeans.D.get_value(), int(numpy.sqrt(n_center)), int(numpy.sqrt(n_center)), 12, 12)
+
+
+def train_minibatch(trainx, trainy, n_center, batch_size=200):
+    X_train, y_train = trainx / 255., trainy
+
+    x = tensor.matrix('x')
+    rng = numpy.random.RandomState(1337)
+
+    kmeans = KMeansCoates(x, X_train.shape[1], n_center, X_train.shape[0], rng)
+    preprocessing = KMeansPreprocessing(x, X_train.shape[1])
+
+    preprocessing_model = theano.function(
+        inputs=[x],
+        outputs=preprocessing.x_whiten
+    )
+
+    x_whiten_all = preprocessing_model(X_train)
+
+    train_model = theano.function(
+        inputs=[x],
+        outputs=(kmeans.update, kmeans.reinitialize),
+    )
+
+    n_batches = trainx.shape[0] // batch_size
+
+    for k in range(10):
+        print "run ", k
+        for index in range(n_batches):
+            x_whiten = x_whiten_all[index * batch_size: (index + 1) * batch_size]
+            update, reinitialize = train_model(x_whiten)
+
+            # update shared variable
+            D = normalize_dict(kmeans.D.get_value() + update)
+            
+            # reinitialize empty clusters
+            for i in range(n_center):
+                if not float(reinitialize[i]):
+                    idx = numpy.random.randint(x_whiten.shape[1])
+                    D[:, i] = x_whiten[idx]
+
+            kmeans.D.set_value(D)
+
+    problem_31(kmeans.D.get_value(), int(numpy.sqrt(n_center)), int(numpy.sqrt(n_center)), 12, 12, name="repflds_batch.png")
 
 
 if __name__ == '__main__':
@@ -136,4 +169,5 @@ if __name__ == '__main__':
     trainx = numpy.asarray(numpy.vstack((trainx, testx)), dtype=numpy.float64)
     trainy = numpy.hstack((trainy, testy))
     print "loaded!"
-    train(trainx, trainy, "cifar.png", 400)
+    train(trainx, trainy, 400)
+    train_minibatch(trainx, trainy, 400, 200)

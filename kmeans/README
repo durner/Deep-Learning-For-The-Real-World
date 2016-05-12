@@ -2,4 +2,6 @@ Problem 30: See kmeans.py
 
 Problem 32: See repflds.png that uses 400 centers.
 
+Bonus Problem: I implemented minibatch kmeans. Therefore, see repflds_batch.png for a 400 center minibatch=200 repflds visualization.
+
 Additional File: real_input.png -> I wanted to see how the scaled image version looks like. It is actually quite hard to distinguish between different objects, especially in gray.
