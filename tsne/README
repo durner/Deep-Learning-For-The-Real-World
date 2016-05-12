@@ -1,5 +1,5 @@
 This is using the https://github.com/lvdmaaten/bhtsne/ implementation for generating the images. Please first compile the binary for your arch.
 
-Problem 28: Since the normal python implementation of tSNE is quite slow, I also choice to use BHtSNE for this question. I plotted CIFAR and the 20 NewsData (TFIDF of the 1500 most important features). For the NewsData the fetching with sklearn is done. So if you want to test this code please uncomment the lines and make sure to have a working scikit learn installed.
+Problem 28: Since the normal python implementation of tSNE is quite slow, I also choice to use BHtSNE for this question. I plotted CIFAR and the 20 NewsData (TFIDF of the 1500 most important features). For the NewsData the fetching is done with sklearn. So if you want to test this code please uncomment the lines and make sure to have a working scikit learn installed.
 
 Problem 29: I did reproduce the Figure 5 of the paper using the real values as the marker. Therefore, zooming into the picture shows the corresponding y value.

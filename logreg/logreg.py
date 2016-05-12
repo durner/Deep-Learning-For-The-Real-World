@@ -20,8 +20,6 @@ def update_weights(cost_function, weights, learning_rate):
     updates = [(weights, weights - learning_rate * update_gradient)]
     return updates
 
-# Expects the input as dim + 1, where the extra dimension
-# must be filled with 1s to be in the space n + bias -> n + 1
 class LogisticRegression(object):
     # Must be in numpy format with train, test, and validation set
     def __init__(self, x, y, n_dim, k_classes):
