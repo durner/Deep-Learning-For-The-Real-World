@@ -270,10 +270,9 @@ if __name__ == '__main__':
     train_data, valid_data, test_data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz")
     trainx, trainy = train_data
 
-    for n in [784, 400, 225, 100]:
-        for k in [0.05, 0.1, 0.2]:
-            train(trainx, nhidden=n, sparsity=True, lambda_param=k)
-            #train_climin(trainx, nhidden=n, sparsity=True, lambda_param=k)
+    for n in [100, 225, 400, 784, 1024]:
+        for k in [0.05, 0.2, 1]:
+    		train_climin(trainx, nhidden=n, sparsity=True, lambda_param=k)
 
     train_climin(trainx, optimizer="rmsprop", sparsity=False, lambda_param=0)
     train(trainx, sparsity=False, lambda_param=0)

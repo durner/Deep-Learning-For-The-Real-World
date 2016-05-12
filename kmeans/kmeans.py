@@ -15,11 +15,6 @@ def normalize_dict(D):
     D /= lengths
     return D
 
-def norm_dict(D):
-    lengths = tensor.sqrt(tensor.sum(D ** 2, axis=0))
-    D /= lengths
-    return D
-
 class KMeansPreprocessing(object):
     def __init__(self, x, dim, eps_var=10, eps_whiten=0.01):
         self.x = x
@@ -41,7 +36,6 @@ class KMeansPreprocessing(object):
         self.x_whiten = tensor.dot(self.x_normalized, self.step_between)
 
 class KMeansCoates(object):
-    # already whitened x needed for KMeans
     def __init__(self, x, dim, centers, batch_size, numpy_rng):
         self.x = x
         self.dim = dim
@@ -64,13 +58,10 @@ class KMeansCoates(object):
 
         self.S = tensor.dot(self.x, self.D)
 
-        indices = tensor.eye(self.centers)[tensor.argmax(self.S, axis=1)]
-        self.S = tensor.switch(indices, self.S, tensor.zeros_like(self.S))
-
         self.update = tensor.dot(self.x.T, self.S)
 
-        self.D = norm_dict(self.D + self.update)
-
+    def return_result(self):
+        return self.S, self.x
 
 def problem_31(values, rows, cols, height, width, name="repflds.png"):
     border = 2
@@ -103,25 +94,41 @@ def train(trainx, trainy, name, n_center):
         outputs=preprocessing.x_whiten
     )
 
+    x_whiten = preprocessing_model(X_train)
+
     train_model = theano.function(
         inputs=[x],
-        outputs=(kmeans.D, kmeans.S),
+        outputs=kmeans.return_result(),
     )
-    x_whiten = preprocessing_model(X_train)
+
+    s = tensor.matrix('s')
+    calculate_update = theano.function(
+        inputs=[x, s],
+        outputs=tensor.dot(x.T, s),
+    )
 
     for k in range(10):
         print "run ", k
-        D, S = train_model(x_whiten)
+        S, x = train_model(X_train)
+
+        # set argmax value only
+        sprime = numpy.zeros((X_train.shape[0], n_center))
+        argmax_k = numpy.argmax(numpy.abs(S), axis=1)
+        for i in xrange(X_train.shape[0]):
+            sprime[i, argmax_k[i]] =  1
+        S *= sprime
+
+        kmeans.D.set_value(normalize_dict(kmeans.D.get_value() + calculate_update(x, S)))
+
 
         # reinitialize empty clusters
         step = numpy.sum(S.T, axis=0)
         for i in range(n_center):
             if step[i] == 0:
                 idx = numpy.random.randint(X_train.shape[1])
-                tensor.set_subtensor(kmeans.D[:, i], kmeans.x[idx])
+                kmeans.D[:, i].set_value(x[idx])
 
-    problem_31(D, int(numpy.sqrt(n_center)), int(numpy.sqrt(n_center)), 12, 12)
-
+    problem_31(kmeans.D.get_value(), int(numpy.sqrt(n_center)), int(numpy.sqrt(n_center)), 12, 12)
 
 
 if __name__ == '__main__':
