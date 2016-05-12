@@ -13,8 +13,8 @@ import matplotlib.pyplot as pyplot
 
 class AutoEncoder(object):
 
-    def __init__(self, x, numpy_rng, n_visible, n_hidden, lambda_param=0.1, sparse_cost = False,
-                 W=None, bhid=None, bvis=None, activation=tensor.nnet.sigmoid):
+    def __init__(self, x, numpy_rng, n_visible, n_hidden, lambda_param=0.1, sparse_cost=False,
+                 W=None, bhid=None, bvis=None, kl_cost=False, activation=tensor.nnet.sigmoid):
         self.n_visible = n_visible
         self.n_hidden = n_hidden
         self.activation = activation
@@ -62,6 +62,9 @@ class AutoEncoder(object):
         if sparse_cost:
             print "sparse"
             self.cost = self.get_sparse_cost()
+        elif kl_cost:
+            print "kl"
+            self.cost = self.get_kl_cost()
         else:
             self.cost = self.get_cost()
 
@@ -123,8 +126,16 @@ class AutoEncoder(object):
         sparse_cost = self.get_cost() + tensor.mean(self.lambda_param * tensor.sum(tensor.abs_(y), axis=1))
         return sparse_cost
 
+    def get_kl_cost(self):
+        y = self.get_hidden_values(self.x)
+        p = self.lambda_param
+        pprime = tensor.mean(y)
+        sparse_cost = p * tensor.log(p) - tensor.log(pprime) + (1 - p) * tensor.log(1 - p) - (1 - p) * tensor.log(1 - pprime)
+        sparse_cost += self.get_cost()
+        return sparse_cost
+
 def train(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.png",
-          sparsity=True, lambda_param=0.1, nhidden=100):
+          sparsity=True, lambda_param=0.1, nhidden=100, kl=False):
     x = tensor.matrix('x')
     index = tensor.lscalar()
     rng = numpy.random.RandomState(1337)
@@ -136,7 +147,8 @@ def train(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.png",
         n_visible=train_set.get_value().shape[1],
         n_hidden=n_hidden,
         lambda_param=lambda_param,
-        sparse_cost=sparsity
+        sparse_cost=sparsity,
+        kl_cost=kl
     )
 
     learning_rate = 0.1
@@ -171,7 +183,7 @@ def train(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.png",
                28, 28, name=name_filter)
 
 def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.png",
-                 optimizer="rmsprop", sparsity=True, lambda_param=0.1, nhidden=100):
+                 optimizer="rmsprop", sparsity=True, lambda_param=0.1, nhidden=100, kl=False):
     n_hidden = 100
 
     train_set = data
@@ -194,7 +206,8 @@ def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.p
         n_visible=train_set.get_value().shape[1],
         n_hidden=n_hidden,
         lambda_param=lambda_param,
-        sparse_cost=sparsity
+        sparse_cost=sparsity,
+        kl_cost=kl
     )
 
     if optimizer is "sgd":
@@ -225,8 +238,12 @@ def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.p
             # reset cost
             c = []
 
-    name_rec = "autoencoderrec_rms_" + str(n_hidden) + "_" + str(lambda_param) + ".png"
-    name_filter ="autoencoderfilter_rms_" + str(n_hidden) + "_" + str(lambda_param) + ".png"
+    sparsity_name = ""
+    if kl:
+        sparse_name = "kl_"
+
+    name_rec = "autoencoderrec_rms_" + sparse_name + str(n_hidden) + "_" + str(lambda_param) + ".png"
+    name_filter ="autoencoderfilter_rms_" + sparse_name + str(n_hidden) + "_" + str(lambda_param) + ".png"
 
     problem_24(auto_encoder.get_reconstructed_input(
         auto_encoder.get_hidden_values(train_set[:100])).eval(), 10, 10, 28, 28, name=name_rec)
@@ -272,7 +289,11 @@ if __name__ == '__main__':
 
     for n in [1024, 784, 400, 225, 100]:
         for k in [0.05, 0.2, 1]:
-    		train_climin(trainx, nhidden=n, sparsity=True, lambda_param=k)
+            train_climin(trainx, nhidden=n, sparsity=True, lambda_param=k)
+
+    for n in [1024, 225]:
+        for k in [0.05, 0.2, 1]:
+            train_climin(trainx, nhidden=n, sparsity=False, kl=True, lambda_param=k)
 
     train_climin(trainx, optimizer="rmsprop", sparsity=False, lambda_param=0)
     train(trainx, sparsity=False, lambda_param=0)

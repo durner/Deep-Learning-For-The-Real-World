@@ -11,3 +11,5 @@ Problem 24: I did test some different combinations of lambdas and hidden unit si
 Problem 25: I also stored several images for autoencoderfilter.png. The string suffix describes the optimizer used, the first number denotes the number of hidden units and the second one the lamda param. We can easily see the effect of increasing lambda. Most of the filters in the sets with more hidden units are having an activation of roughly 0 and some have some general representation of the correspeonding numbers, whereas with a lower lambda the filters have specialized activation of parts of the number. The lower the number of hidden units, the less the sparsity constraint drives the overall cost. Hence, most hidden units, also with high lambda, are activated to represent some generalization of a specific number.
 
 Problem 26: 
+
+Bonus Problem: I also added KL Divergence, for the results of the filter and reconstructions just look at the files with the substring _kl_.
