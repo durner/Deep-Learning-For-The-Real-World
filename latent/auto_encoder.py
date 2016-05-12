@@ -129,8 +129,8 @@ class AutoEncoder(object):
     def get_kl_cost(self):
         y = self.get_hidden_values(self.x)
         p = self.lambda_param
-        pprime = tensor.mean(y)
-        sparse_cost = p * tensor.log(p) - tensor.log(pprime) + (1 - p) * tensor.log(1 - p) - (1 - p) * tensor.log(1 - pprime)
+        pprime = tensor.mean(tensor.abs_(y), axis=1)
+        sparse_cost = tensor.sum(p * tensor.log(p) - tensor.log(pprime) + (1 - p) * tensor.log(1 - p) - (1 - p) * tensor.log(1 - pprime))
         sparse_cost += self.get_cost()
         return sparse_cost
 
@@ -238,12 +238,8 @@ def train_climin(data, epochs=10, activation=tensor.nnet.sigmoid, name="errors.p
             # reset cost
             c = []
 
-    sparsity_name = ""
-    if kl:
-        sparse_name = "kl_"
-
-    name_rec = "autoencoderrec_rms_" + sparse_name + str(n_hidden) + "_" + str(lambda_param) + ".png"
-    name_filter ="autoencoderfilter_rms_" + sparse_name + str(n_hidden) + "_" + str(lambda_param) + ".png"
+    name_rec = "autoencoderrec_rms_" + str(n_hidden) + "_" + str(lambda_param) + ".png"
+    name_filter ="autoencoderfilter_rms_" + str(n_hidden) + "_" + str(lambda_param) + ".png"
 
     problem_24(auto_encoder.get_reconstructed_input(
         auto_encoder.get_hidden_values(train_set[:100])).eval(), 10, 10, 28, 28, name=name_rec)
@@ -290,10 +286,6 @@ if __name__ == '__main__':
     for n in [1024, 784, 400, 225, 100]:
         for k in [0.05, 0.2, 1]:
             train_climin(trainx, nhidden=n, sparsity=True, lambda_param=k)
-
-    for n in [1024, 225]:
-        for k in [0.05, 0.2, 1]:
-            train_climin(trainx, nhidden=n, sparsity=False, kl=True, lambda_param=k)
 
     train_climin(trainx, optimizer="rmsprop", sparsity=False, lambda_param=0)
     train(trainx, sparsity=False, lambda_param=0)
