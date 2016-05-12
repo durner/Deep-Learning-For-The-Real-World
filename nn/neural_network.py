@@ -32,7 +32,7 @@ class HiddenLayer(object):
                 dtype=tensor.dscalar()
             )
 
-            if activation == tensor.nnet.sigmoid:
+            if activation == tensor.nnet.sigmoid: # if activation == tensor.tanh: for testing
                 w *= 4
 
             self.weights = theano.shared(value=w, name='weights_hidden')
@@ -413,7 +413,7 @@ def problem_19():
 def problem_16():
     data = utils.loadMinstDataSet(current_dir + "../mnist.pkl.gz", augument=False)
     classifier, smallest_validation_loss = \
-        train_climin(data, True, epochs=30, activation=tensor.nnet.sigmoid, name='errors_sigmoid.png')
+        train_climin(data, True, epochs=30, activation=tensor.nnet.sigmoid, name='errors_sigmoid.png', optimizer="sgd")
     print(
         'Test Set Error: %f %%' %
         (
@@ -423,7 +423,7 @@ def problem_16():
     problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_sigmoid.png")
 
     classifier, smallest_validation_loss = \
-        train_climin(data, True, epochs=30, activation=tensor.tanh, name='errors_tanh.png')
+        train_climin(data, True, epochs=30, activation=tensor.tanh, name='errors_tanh.png', optimizer="sgd")
     print(
         'Test Set Error: %f %%' %
         (
@@ -433,7 +433,7 @@ def problem_16():
     problem_18(classifier.hidden_layer.weights.eval(), 15, 20, 28, 28, name="repflds_tanh.png")
 
     classifier, smallest_validation_loss = \
-        train_climin(data, True, epochs=30, activation=tensor.nnet.relu, name='errors_relu.png')
+        train_climin(data, True, epochs=30, activation=tensor.nnet.relu, name='errors_relu.png', optimizer="sgd")
     print(
         'Test Set Error: %f %%' %
         (
