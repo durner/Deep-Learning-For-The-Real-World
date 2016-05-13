@@ -129,8 +129,9 @@ class AutoEncoder(object):
     def get_kl_cost(self):
         y = self.get_hidden_values(self.x)
         p = self.lambda_param
-        pprime = tensor.mean(tensor.abs_(y), axis=1)
-        sparse_cost = tensor.sum(p * tensor.log(p) - tensor.log(pprime) + (1 - p) * tensor.log(1 - p) - (1 - p) * tensor.log(1 - pprime))
+        pprime = tensor.mean(y, axis=0)
+        sparse_cost = p * tensor.log(p) - tensor.log(pprime) + (1 - p) * tensor.log(1 - p) - (1 - p) * tensor.log(1 - pprime)
+        sparse_cost = tensor.mean(sparse_cost)
         sparse_cost += self.get_cost()
         return sparse_cost
 
@@ -289,3 +290,8 @@ if __name__ == '__main__':
 
     train_climin(trainx, optimizer="rmsprop", sparsity=False, lambda_param=0)
     train(trainx, sparsity=False, lambda_param=0)
+
+    # KL Divergence
+    for k in [0.04, 0.02]:
+        for n in [1024, 225]:
+            train_climin(trainx, nhidden=n, sparsity=False, kl=True, lambda_param=k)
